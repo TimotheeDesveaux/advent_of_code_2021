@@ -1,32 +1,33 @@
-use std::fs::File;
-use std::io::{self, BufRead};
-use std::path::Path;
+fn count_increase_windowed(depths: &Vec<i32>, window_size: usize) -> u32 {
+    if depths.len() <= window_size {
+        return 0;
+    }
 
-fn read_lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
-where
-    P: AsRef<Path>,
-{
-    let file = File::open(filename)?;
-    Ok(io::BufReader::new(file).lines())
-}
+    let mut count: u32 = 0;
 
-fn main() {
-    let mut previous_depth = -1;
-    let mut count_increase = 0;
-    if let Ok(lines) = read_lines("./input.txt") {
-        for line in lines {
-            if let Ok(ip) = line {
-                let depth: i32 = ip.trim().parse().expect("Line should be a number");
-                if previous_depth != -1 && previous_depth < depth {
-                    count_increase += 1;
-                }
-                previous_depth = depth;
-            }
+    for i in (window_size)..depths.len() {
+        if &depths[(i - window_size)..(i)].iter().sum::<i32>()
+            < &depths[(i - window_size + 1)..(i + 1)].iter().sum::<i32>()
+        {
+            count += 1;
         }
     }
 
+    count
+}
+
+fn main() {
+    let input = include_str!("input.txt");
+
+    let depths: Vec<i32> = input.lines().map(|l| l.parse::<i32>().unwrap()).collect();
+
+    let count1 = count_increase_windowed(&depths, 1);
+    let count2 = count_increase_windowed(&depths, 3);
+
     println!(
         "There are {} measurements larger than the previous one.",
-        count_increase
+        count1
     );
+
+    println!("There are {} sums larger than the previous one.", count2);
 }
