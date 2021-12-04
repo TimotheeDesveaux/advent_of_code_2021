@@ -1,5 +1,6 @@
 struct Board {
     numbers: [i32; 5 * 5],
+    is_won: bool,
 }
 
 impl Board {
@@ -11,6 +12,7 @@ impl Board {
 
         Board {
             numbers: vec.try_into().unwrap(),
+            is_won: false,
         }
     }
 
@@ -19,6 +21,7 @@ impl Board {
         match index {
             Some(i) => {
                 self.numbers[i] = -1;
+                self.is_won = self.is_row_won() || self.is_column_won();
                 true
             }
             _ => false,
@@ -31,15 +34,15 @@ impl Board {
 
     fn is_column_won(&self) -> bool {
         for x in 0..5 {
-            let mut is_valid = true;
+            let mut is_complete = true;
             for y in 0..5 {
                 if self.get_number(x, y) != -1 {
-                    is_valid = false;
+                    is_complete = false;
                     break;
                 }
             }
 
-            if is_valid {
+            if is_complete {
                 return true;
             }
         }
@@ -49,24 +52,20 @@ impl Board {
 
     fn is_row_won(&self) -> bool {
         for y in 0..5 {
-            let mut is_valid = true;
+            let mut is_complete = true;
             for x in 0..5 {
                 if self.get_number(x, y) != -1 {
-                    is_valid = false;
+                    is_complete = false;
                     break;
                 }
             }
 
-            if is_valid {
+            if is_complete {
                 return true;
             }
         }
 
         false
-    }
-
-    fn is_won(&self) -> bool {
-        self.is_column_won() || self.is_row_won()
     }
 
     fn sum_unmarked(&self) -> i32 {
@@ -76,20 +75,7 @@ impl Board {
     }
 }
 
-fn part_one(drawn_numbers: &Vec<i32>, boards: &mut Vec<Board>) {
-    for number in drawn_numbers.iter() {
-        for board in boards.iter_mut() {
-            if board.draw_number(number) && board.is_won() {
-                println!("The final score is {}", board.sum_unmarked() * number);
-                return;
-            }
-        }
-    }
-}
-
-fn main() {
-    let input = include_str!("input.txt");
-
+fn part_one(input: &str) -> i32 {
     let mut sections = input.split("\n\n");
     let drawn_numbers: Vec<i32> = sections
         .next()
@@ -99,5 +85,48 @@ fn main() {
         .collect();
     let mut boards: Vec<Board> = sections.map(|s| Board::from_input(s)).collect();
 
-    part_one(&drawn_numbers, &mut boards);
+    for number in drawn_numbers.iter() {
+        for board in boards.iter_mut() {
+            if board.draw_number(number) && board.is_won {
+                return board.sum_unmarked() * number;
+            }
+        }
+    }
+
+    -1
+}
+
+fn part_two(input: &str) -> i32 {
+    let mut sections = input.split("\n\n");
+    let drawn_numbers: Vec<i32> = sections
+        .next()
+        .unwrap()
+        .split(',')
+        .map(|n| n.parse::<i32>().unwrap())
+        .collect();
+    let mut boards: Vec<Board> = sections.map(|s| Board::from_input(s)).collect();
+
+    let mut unfinished_board = boards.len();
+    for number in drawn_numbers.iter() {
+        for board in boards.iter_mut().filter(|b| !b.is_won) {
+            if board.draw_number(number) && board.is_won {
+                unfinished_board -= 1;
+                if unfinished_board == 0 {
+                    return board.sum_unmarked() * number;
+                }
+            }
+        }
+    }
+
+    -1
+}
+
+fn main() {
+    let input = include_str!("input.txt");
+
+    let score1 = part_one(input);
+    let score2 = part_two(input);
+
+    println!("The score of the winning board is {}", score1);
+    println!("The score of the last remaining board is {}", score2);
 }
