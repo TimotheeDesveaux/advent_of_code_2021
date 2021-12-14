@@ -1,12 +1,10 @@
 use itertools::Itertools;
 use std::collections::HashMap;
 
-fn part_one(input: &str) -> u32 {
+fn solve(input: &str, step: u32) -> u64 {
     let (template, pairs_insertion) = input.split_once("\n\n").unwrap();
 
-    let mut pairs: Vec<(char, char)> = template.chars().tuple_windows().collect();
-
-    let pairs_insertion: HashMap<(char, char), char> = pairs_insertion
+    let pair_insertions: HashMap<(char, char), char> = pairs_insertion
         .lines()
         .map(|l| l.split_once(" -> ").unwrap())
         .map(|(p, i)| {
@@ -17,31 +15,47 @@ fn part_one(input: &str) -> u32 {
         })
         .collect();
 
-    for _ in 0..10 {
-        let mut pairs_tmp: Vec<(char, char)> = Vec::new();
-        for pair in pairs {
-            let insert = pairs_insertion[&pair];
-            pairs_tmp.push((pair.0, insert));
-            pairs_tmp.push((insert, pair.1));
+    let mut pair_frequencies: HashMap<(char, char), u64> =
+        template.chars().tuple_windows().map(|p| (p, 1)).collect();
+
+    for _ in 0..step {
+        let mut pair_frequencies_tmp: HashMap<(char, char), u64> = HashMap::new();
+        for (pair, freq) in &pair_frequencies {
+            let insert = pair_insertions[pair];
+            *pair_frequencies_tmp.entry((pair.0, insert)).or_default() += freq;
+            *pair_frequencies_tmp.entry((insert, pair.1)).or_default() += freq;
         }
-        pairs = pairs_tmp;
+
+        pair_frequencies = pair_frequencies_tmp;
     }
 
     let mut hist = [0; 26];
-    for pair in &pairs {
-        hist[pair.0 as usize - 'A' as usize] += 1;
+    for (pair, freq) in &pair_frequencies {
+        hist[pair.0 as usize - 'A' as usize] += freq;
     }
-    hist[pairs.last().unwrap().1 as usize - 'A' as usize] += 1;
+    hist[template.chars().last().unwrap() as usize - 'A' as usize] += 1;
 
     hist.iter().max().unwrap() - hist.iter().filter(|&&n| n > 0).min().unwrap()
+}
+
+fn part_one(input: &str) -> u64 {
+    solve(input, 10)
+}
+
+fn part_two(input: &str) -> u64 {
+    solve(input, 40)
 }
 
 fn main() {
     let input = include_str!("input.txt");
 
-    let sub = part_one(input);
+    let sub1 = part_one(input);
+    let sub2 = part_two(input);
 
     println!(
-        "The difference between the occurence of the most common element and the least common element is {}",
-         sub);
+        "The difference between the occurence of the most common element and the least common element after 10 steps is {}",
+         sub1);
+    println!(
+        "The difference between the occurence of the most common element and the least common element after 40 steps is {}",
+         sub2);
 }
