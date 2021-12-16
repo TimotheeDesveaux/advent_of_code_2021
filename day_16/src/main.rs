@@ -9,7 +9,7 @@ impl Packet {
         let version: u8 = bits_to_decimal(take_and_advance(bits, ptr, 3))
             .try_into()
             .unwrap();
-        let content = Content::parse(&bits, ptr);
+        let content = Content::parse(bits, ptr);
 
         Packet { version, content }
     }
@@ -23,6 +23,10 @@ impl Packet {
                 .fold(self.version as u32, |acc, p| acc + p.sum_versions()),
         }
     }
+
+    fn eval(&self) -> u64 {
+        self.content.eval()
+    }
 }
 
 #[derive(Debug)]
@@ -33,7 +37,10 @@ enum Content {
 
 impl Content {
     fn parse(bits: &[u8], ptr: &mut usize) -> Content {
-        let type_id = bits_to_decimal(take_and_advance(bits, ptr, 3));
+        let type_id: u8 = bits_to_decimal(take_and_advance(bits, ptr, 3))
+            .try_into()
+            .unwrap();
+
         if type_id == 4 {
             let mut literal: u64 = 0;
             loop {
@@ -44,18 +51,26 @@ impl Content {
                 }
             }
         } else {
-            Self::Operator(Operator::parse(&bits, ptr))
+            Self::Operator(Operator::parse(bits, ptr, type_id))
+        }
+    }
+
+    fn eval(&self) -> u64 {
+        match self {
+            Self::Literal(n) => *n,
+            Self::Operator(operator) => operator.eval(),
         }
     }
 }
 
 #[derive(Debug)]
 struct Operator {
+    operator_type: OperatorType,
     sub_packets: Vec<Packet>,
 }
 
 impl Operator {
-    fn parse(bits: &[u8], ptr: &mut usize) -> Operator {
+    fn parse(bits: &[u8], ptr: &mut usize, type_id: u8) -> Operator {
         let mut sub_packets: Vec<Packet> = Vec::new();
         let length_type_id = take_one_and_advance(bits, ptr);
 
@@ -75,8 +90,66 @@ impl Operator {
             }
         }
 
-        Operator { sub_packets }
+        let operator_type = match type_id {
+            0 => OperatorType::Sum,
+            1 => OperatorType::Product,
+            2 => OperatorType::Mininumum,
+            3 => OperatorType::Maximum,
+            5 => OperatorType::Greater,
+            6 => OperatorType::Lower,
+            7 => OperatorType::Equal,
+            _ => panic!(),
+        };
+
+        Operator {
+            operator_type,
+            sub_packets,
+        }
     }
+
+    fn eval(&self) -> u64 {
+        match self.operator_type {
+            OperatorType::Sum => self.sub_packets.iter().fold(0, |acc, p| acc + p.eval()),
+            OperatorType::Product => self.sub_packets.iter().fold(1, |acc, p| acc * p.eval()),
+            OperatorType::Mininumum => self.sub_packets.iter().map(|p| p.eval()).min().unwrap(),
+            OperatorType::Maximum => self.sub_packets.iter().map(|p| p.eval()).max().unwrap(),
+            OperatorType::Greater => {
+                assert!(self.sub_packets.len() == 2);
+                if self.sub_packets[0].eval() > self.sub_packets[1].eval() {
+                    1
+                } else {
+                    0
+                }
+            }
+            OperatorType::Lower => {
+                assert!(self.sub_packets.len() == 2);
+                if self.sub_packets[0].eval() < self.sub_packets[1].eval() {
+                    1
+                } else {
+                    0
+                }
+            }
+            OperatorType::Equal => {
+                assert!(self.sub_packets.len() == 2);
+                if self.sub_packets[0].eval() == self.sub_packets[1].eval() {
+                    1
+                } else {
+                    0
+                }
+            }
+        }
+    }
+}
+
+#[derive(Debug)]
+enum OperatorType {
+    Sum,
+    Product,
+    Mininumum,
+    Maximum,
+    Greater,
+    Lower,
+    Equal,
 }
 
 fn take_and_advance<'a>(bits: &'a [u8], ptr: &mut usize, length: usize) -> &'a [u8] {
@@ -121,15 +194,22 @@ fn part_one(input: &str) -> u32 {
     let bits = hex_to_bits(input.trim());
     let packet = Packet::parse(&bits, &mut 0);
 
-    println!("{:#?}", packet);
-
     packet.sum_versions()
+}
+
+fn part_two(input: &str) -> u64 {
+    let bits = hex_to_bits(input.trim());
+    let packet = Packet::parse(&bits, &mut 0);
+
+    packet.eval()
 }
 
 fn main() {
     let input = include_str!("input.txt");
 
     let versions_sum = part_one(input);
+    let eval = part_two(input);
 
     println!("The sum of the version of all packets is {}", versions_sum);
+    println!("The evaluation of the transmission is {}", eval);
 }
